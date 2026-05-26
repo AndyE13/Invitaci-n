@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Invitation</title>
+
+<style>
+body {
+  margin: 0;
+  overflow: hidden;
+  font-family: Arial, sans-serif;
+  background: radial-gradient(circle at center, #3a0000, #000);
+  transition: filter 1s, background 1s;
+}
+
+#ui {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  pointer-events: none;
+}
+
+.carta {
+  background: white;
+  color: #222;
+  padding: 40px;
+  border-radius: 15px;
+  width: 380px;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  opacity: 0;
+  transform: translateY(-50px);
+  transition: 0.8s;
+  pointer-events: auto;
+}
+
+.carta.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+button {
+  margin: 15px;
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+#aceptar {
+  background: #e63946;
+  color: white;
+}
+
+#declinar {
+  background: #444;
+  color: white;
+}
+
+#goose {
+  position: absolute;
+  width: 360px;
+  height: auto;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  z-index: 10;
+  pointer-events: none;
+  object-fit: contain;
+}
+</style>
+</head>
+
+<body>
+
+<video id="goose" src="goose.webm" autoplay loop muted playsinline></video>
+
+<div id="ui">
+  <div class="carta" id="carta">
+    <h2>¿Can i please be part of your team?<h2>
+    <button id="aceptar">Accept</button>
+    <button id="declinar">Decline</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
+<script>
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer({ alpha:true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+camera.position.z = 6;
+
+const light = new THREE.PointLight(0xffffff, 1);
+light.position.set(5,5,5);
+scene.add(light);
+
+// Sobre
+const geometry = new THREE.BoxGeometry(4,2.5,0.3);
+const material = new THREE.MeshStandardMaterial({ color: 0xb11226 });
+const envelope = new THREE.Mesh(geometry, material);
+scene.add(envelope);
+
+// Flotación
+gsap.to(envelope.position, {
+  y: 0.3,
+  duration: 2,
+  yoyo: true,
+  repeat: -1,
+  ease: "sine.inOut"
+});
+
+// Raycaster
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+window.addEventListener("click", (event) => {
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+  raycaster.setFromCamera(mouse, camera);
+  const intersects = raycaster.intersectObjects([envelope]);
+
+  if(intersects.length > 0) abrirCarta();
+});
+
+function abrirCarta(){
+  gsap.to(envelope.rotation, { x: -Math.PI / 2, duration: 1 });
+  document.getElementById("carta").classList.add("visible");
+}
+
+// TEXTURA CORAZÓN
+function createHeartTexture(color="red") {
+  const canvas = document.createElement("canvas");
+  canvas.width = 64;
+  canvas.height = 64;
+  const ctx = canvas.getContext("2d");
+
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(32, 50);
+  ctx.bezierCurveTo(0, 20, 16, 0, 32, 20);
+  ctx.bezierCurveTo(48, 0, 64, 20, 32, 50);
+  ctx.fill();
+
+  return new THREE.CanvasTexture(canvas);
+}
+
+// PARTICULAS
+function crearParticulas(color, size=0.5) {
+  const count = 800;
+  const geometry = new THREE.BufferGeometry();
+  const positions = new Float32Array(count * 3);
+
+  for (let i = 0; i < count * 3; i++) {
+    positions[i] = (Math.random() - 0.5) * 20;
+  }
+
+  geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+
+  const material = new THREE.PointsMaterial({
+    size: size,
+    map: createHeartTexture(color),
+    transparent: true,
+    depthWrite: false
+  });
+
+  const particles = new THREE.Points(geometry, material);
+  scene.add(particles);
+
+  gsap.to(particles.rotation, {
+    y: Math.PI * 2,
+    duration: 20,
+    repeat: -1,
+    ease: "none"
+  });
+}
+
+// ACEPTAR
+document.getElementById("aceptar").addEventListener("click", () => {
+  document.getElementById("carta").style.display = "none";
+  document.getElementById("goose").style.opacity = 1;
+  crearParticulas("red", 0.5);
+});
+
+// DECLINAR
+document.getElementById("declinar").addEventListener("click", () => {
+  document.body.style.filter = "grayscale(100%)";
+  document.body.style.background = "black";
+  document.getElementById("carta").style.display = "none";
+  crearParticulas("gray", 0.3);
+});
+
+// LOOP
+function animate(){
+  requestAnimationFrame(animate);
+  renderer.render(scene, camera);
+}
+animate();
+
+window.addEventListener("resize", ()=>{
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+
+</body>
+</html>
